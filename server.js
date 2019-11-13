@@ -1,5 +1,6 @@
 let express = require('express')
 let app = express()
+let sanitizeHTML = require('sanitize-html')
 
 //allows use of public folder
 app.use(express.static('public'))
@@ -14,6 +15,19 @@ mongodb.connect(connectionString, { useNewUrlParser: true }, function (err, clie
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
+
+//param 1 - 
+function passwordProtected(req, res, next) {
+  res.set('WWW-Authenticate', 'Basic realm="Simple Todo App"')
+  console.log(req.headers.authorization)
+  if (req.headers.authorization == 'Basic dXNlcjp1c2Vy') {
+    next()
+  } else {
+    res.status(401).send('Authentication required')
+  }
+}
+
+app.use(passwordProtected)
 
 //when someone sends a get request that takes them to the homepage '/'
 app.get('/', function (req, res) {
@@ -31,29 +45,22 @@ app.get('/', function (req, res) {
     <h1 class="display-4 text-center py-1">To-Do App</h1>
     
     <div class="jumbotron p-3 shadow-sm">
-      <form action='/create-item' method='POST'>
+      <form id="create-form" action='/create-item' method='POST'>
         <div class="d-flex align-items-center">
-          <input name='item' autofocus autocomplete="off" class="form-control mr-3" type="text" style="flex: 1;">
+          <input id="create-field" name='item' autofocus autocomplete="off" class="form-control mr-3" type="text" style="flex: 1;">
           <button class="btn btn-primary">Add New Item</button>
         </div>
       </form>
     </div>
     
-    <ul class="list-group pb-5">
-      ${items.map(function (item) {
-      return `
-            <li class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
-        <span class="item-text">${item.text}</span>
-        <div>
-          <button class="edit-me btn btn-secondary btn-sm mr-1">Edit</button>
-          <button class="delete-me btn btn-danger btn-sm">Delete</button>
-        </div>
-             </li>
-            `
-    }).join('')}
+    <ul id="item-list" class="list-group pb-5">      
     </ul >
     
   </div >
+
+  <script>
+  let items = ${JSON.stringify(items)} 
+  </script>
 
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="/browser.js"> </script>
@@ -64,14 +71,26 @@ app.get('/', function (req, res) {
 })
 
 app.post('/create-item', function (req, res) {
-  //iunput in the input field   
-  db.collection('items').insertOne({ text: req.body.item }, function () {
-    res.redirect('/')
-
+  //allowed tags and attributes are noit allowed
+  let safeText = sanitizeHTML(req.body.text, { allowedTags: [], allowedAttributes: {} })
+  db.collection('items').insertOne({ text: safeText }, function (err, info) {
+    res.json(info.ops[0])
   })
 })
 
 app.post('/update-item', function (req, res) {
-  console.log(req.body.text)
-  res.send("Success")
+  // first arg tells us which document to update, 2nd argument we tell it what to update on that doc, 3rd arg is function that gets called after dataase action is complete
+  //findOneAndUpdate updates document
+  let safeText = sanitizeHTML(req.body.text, { allowedTags: [], allowedAttributes: {} })
+
+  db.collection('items').findOneAndUpdate({ _id: new mongodb.ObjectID(req.body.id) }, { $set: { text: safeText } }, function () {
+    res.send("Success")
+  })
+})
+
+//delete one is 
+app.post('/delete-item', function (req, res) {
+  db.collection('items').deleteOne({ _id: new mongodb.ObjectId(req.body.id) }, function () {
+    res.send("Success")
+  })
 })

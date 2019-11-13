@@ -15,6 +15,7 @@
     "express": "^4.17.1",
     "mongodb": "^3.3.3",
     "nodemailer": "^6.3.1",
-    "nodemon": "^1.19.4"
+    "nodemon": "^1.19.4",
+    "sanitize-html": "^1.20.1"
   }
 }
